@@ -1,0 +1,664 @@
+Load Libraries
+```{r}
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(stringr)
+```
+
+
+1. Data Preprocessing
+```{r }
+data_movies=read.csv("ml-latest-small/movies.csv")
+data_ratings=read.csv("ml-latest-small/ratings.csv")
+data_moviesRatings=inner_join(data_movies, data_ratings, by='movieId')
+
+#Transform Timestamp to Date
+data_moviesRatings=mutate(data_moviesRatings,timestamp=as.POSIXct(data_moviesRatings[,6], tz='UTC', origin='1970-01-01'))
+
+# Add Day Month and Year variable in the main data
+data_moviesRatings=data_moviesRatings%>%
+mutate(Year=year(timestamp), Day=day(timestamp), Month=month(timestamp,label=TRUE), Hour=hour(timestamp), Week=wday(timestamp, label=TRUE))
+
+data_moviesRatings$Hour[data_moviesRatings$Hour == 0] <- 24
+
+str(data_moviesRatings)
+
+```
+
+Q1.1 - The distribution of ratings per movie (i.e. how many ratings are there per movie?).
+
+```{r}
+#------------------------------------------------------------------------------------    
+
+                  # 1. RATINGS BY MOVIE from 1995 - 2016
+    
+    Q1.1_ratingsByMovie=data_moviesRatings%>%
+    group_by(movieId)%>%
+    summarise(ratingsByMovie=n())%>%
+    arrange(desc(ratingsByMovie))%>%
+    transform(cumMovie = cumsum(ratingsByMovie),propMovieRatings=round(ratingsByMovie/sum(ratingsByMovie),digits=4))
+      
+    Q1.1_ratingsByMovie$freqMovie<-seq.int(nrow(Q1.1_ratingsByMovie))
+    
+    # Plot distribution of cumulative ratings by Movie
+    ggplot(Q1.1_ratingsByMovie, 
+          aes(freqMovie,cumMovie)) + 
+          geom_line() +
+          xlab("Movies Added") +
+          ylab("Cummulative Ratings") +
+          ggtitle("Growth of ratings with addition of movies") +
+          theme(panel.background = element_blank())+
+          labs(caption = "b) Growth of ratings with movies \n from 1995 - 2016")
+    
+
+      
+    # Plot distribution of ratings over time
+    ggplot(Q1.1_ratingsByMovie,aes(movieId,ratingsByMovie)) + 
+      geom_line() +
+      theme(panel.background = element_blank())+
+      ylim(c(1,400))+
+      xlab("Movie Id") +
+      ylab("Total number of ratings received") +
+      ggtitle("Distribution of ratings / movie")+    labs(caption = "a) Distribution of ratings / movie \n from 1995 - 2016")
+    
+        
+#------------------------------------------------------------------------------------    
+
+                                  # 2. CHRISTMAS
+    
+ratingsChristmas=data_moviesRatings[ data_moviesRatings$Day>25 & data_moviesRatings$Month<12,]%>%
+    group_by(movieId)%>%
+    summarise(ratingsByMovie=n())%>%
+    arrange(movieId)
+
+    # Plot distribution of ratings over Christmas
+    ggplot(ratingsChristmas,
+          aes(movieId,ratingsByMovie)) + 
+          geom_line() +
+          theme(panel.background = element_blank())+
+          ylim(c(1,400))+
+          xlab("Movie Id") +
+          ylab("Total number of ratings received") +
+          ggtitle("Distribution of ratings / movie from 1995 - 2016 \n over Xmas")+    labs(caption = "b) Movie ratings on Xmas from 1995 - 2016")
+    
+#------------------------------------------------------------------------------------    
+                        
+                          # 3. WEEKDAYS EXCLUDING XMAS
+    
+ratingsWeekdays=data_moviesRatings[ data_moviesRatings$Week<6 & !(data_moviesRatings$Day==25 & data_moviesRatings$Month==12),]
+ratingsWeekdays=data_moviesRatings[ data_moviesRatings$Week<6 & !(data_moviesRatings$Day==25 & data_moviesRatings$Month==12),]%>%
+    group_by(movieId)%>%
+    summarise(ratingsByMovie=n())%>%
+    arrange(movieId)
+
+
+    # Plot distribution of ratings over weekdays
+    ggplot(ratingsWeekdays,
+          aes(movieId,ratingsByMovie)) + 
+          geom_line() +
+          theme(panel.background = element_blank())+
+          ylim(c(1,400))+
+          xlab("Movie Id") +
+          ylab("Total number of ratings received") +
+          ggtitle("Distribution of ratings / movie from 1995 - 2016 \n over weekdays excluding Xmas")+labs(caption = "a) Movie ratings from 1995 - 2016 on \n weekdays excluding Xmas")
+    
+    
+    
+    
+  
+#------------------------------------------------------------------------------------    
+
+                          # 4. WEEKEND EXCLUDING XMAS
+ 
+     ratingsWeekend=data_moviesRatings[ data_moviesRatings$Week>5& !(data_moviesRatings$Day==25 & data_moviesRatings$Month==12),]%>%
+    group_by(movieId)%>%
+    summarise(ratingsByMovie=n())%>%
+    arrange(movieId)
+
+
+    # Plot distribution of ratings over weekend
+    ggplot(ratingsWeekend,
+          aes(movieId,ratingsByMovie)) + 
+          geom_line()  +
+          theme(panel.background = element_blank())+
+          ylim(c(1,400))+
+          xlab("Movie Id") +
+          ylab("Total number of ratings received") +
+          ggtitle("Distribution of ratings / movie from 1995 - 2016 \n over weekends excluding Xmas")+ labs(caption = "")+labs(caption = "b) Movie ratings from 1995 - 2016 on \n weekends excluding Xmas")
+    
+    
+#------------------------------------------------------------------------------------    
+                        
+                  # Misc. Analysis on WEEKDAYS & WEEKEND pattern
+  #ratings2005
+    
+    ratings2005=data_moviesRatings[ 
+  data_moviesRatings$Year==2005 & data_moviesRatings$Month<7,]%>%
+    group_by(movieId)%>%
+    summarise(ratingsByMovie=n())%>%
+    arrange(movieId)
+
+    
+    
+#ratingsWeekdaysAnalysis
+  ratingsWeekdaysAnalysis=data_moviesRatings[ 
+  data_moviesRatings$Week<6 & data_moviesRatings$Year==2005 & data_moviesRatings$Month<7,]%>%
+    group_by(movieId)%>%
+    summarise(ratingsByMovie=n())%>%
+    arrange(movieId)
+
+
+    # Plot distribution of ratings over weekdays
+    ggplot(ratingsWeekdaysAnalysis,
+          aes(movieId,ratingsByMovie)) + 
+          geom_line() +
+          theme(panel.background = element_blank())+
+          ylim(c(1,15))+
+          xlab("Movie Id") +
+          ylab("Total number of ratings received") +
+          ggtitle("Distribution of ratings / movie \n over weekdays in first half - 2005")+labs(caption = "a) Movie ratings for first 6 months \n 2005 weekdays")
+    
+#ratingsWeekendAnalysis
+  ratingsweekendAnalysis=data_moviesRatings[ 
+  data_moviesRatings$Week>5 & data_moviesRatings$Year==2005 & data_moviesRatings$Month<7,]%>%
+    group_by(movieId)%>%
+    summarise(ratingsByMovie=n())%>%
+    arrange(movieId)
+
+
+    # Plot distribution of ratings over weekdays
+    ggplot(ratingsweekendAnalysis,
+          aes(movieId,ratingsByMovie)) + 
+          geom_line() +
+          theme(panel.background = element_blank())+
+          ylim(c(1,15))+
+          xlab("Movie Id") +
+          ylab("Total number of ratings received") +
+          ggtitle("Distribution of ratings / movie \n over weekend in first half - 2005") +labs(caption = "a) Movie ratings for first 6 months \n 2005 weekends")
+    
+  
+
+    
+# Analysis Report
+
+# For first half 2005
+sum(ratingsWeekdaysAnalysis$ratingsByMovie)/sum(ratingsweekendAnalysis$ratingsByMovie)
+sum(ratingsWeekdaysAnalysis$ratingsByMovie)/sum(ratings2005$ratingsByMovie)*100
+sum(ratingsweekendAnalysis$ratingsByMovie)/sum(ratings2005$ratingsByMovie)*100
+
+
+# From 1996 to 2016
+sum(ratingsWeekdays$ratingsByMovie)/sum(ratingsWeekend$ratingsByMovie)
+sum(ratingsWeekend$ratingsByMovie)/sum(Q1.1_ratingsByMovie$ratingsByMovie)*100
+sum(ratingsWeekdays$ratingsByMovie)/sum(Q1.1_ratingsByMovie$ratingsByMovie)*100
+sum(ratingsChristmas$ratingsByMovie)/sum(Q1.1_ratingsByMovie$ratingsByMovie)*100
+
+```
+
+Popular Movie Analysis
+```{r}
+    
+        # AllTime Favouite (Most watched)
+    AllTimeFav=data_moviesRatings%>%
+    group_by(title)%>%
+    summarise(ratingsByMovie=n(),avgRatingScore=mean(rating))%>%
+    arrange(desc(ratingsByMovie))
+
+    mostWatchedAllTimefav=head(AllTimeFav,6)     
+
+
+   # WeekendDatabase (Most watched)
+    movieWeekendDatabase=data_moviesRatings[data_moviesRatings$Week>5,]%>%
+    group_by(title)%>%
+    summarise(ratingsByMovie=n(),avgRatingScore=mean(rating))%>%
+    arrange(desc(ratingsByMovie))
+
+    mostWatchedWeekendDatabase=head(movieWeekendDatabase,15)
+
+   
+        # WeekdayDatabase (Most watched)
+    movieWeekdayDatabase=data_moviesRatings[data_moviesRatings$Week<6,]%>%
+    group_by(title)%>%
+    summarise(ratingsByMovie=n(),avgRatingScore=mean(rating))%>%
+    arrange(desc(ratingsByMovie))
+
+    mostWatchedWeekdayDatabase=head(movieWeekdayDatabase,15)
+    
+    
+
+```
+
+Q1.2_ratingsByUser
+User database Growth
+```{r}
+
+# Users
+
+# Analysis on impact on ratings with the growth of User database    
+Q1.2_ratingsByUser=data_moviesRatings%>%
+      group_by(userId)%>%
+      summarise(ratingsByUser=length(rating))%>%
+      transform(cumUser = cumsum(ratingsByUser),propUserRatings=round(ratingsByUser/sum(ratingsByUser),digits=4))
+      
+    Q1.2_ratingsByUser$freqUsers<-seq.int(nrow(Q1.2_ratingsByUser))
+
+    
+    # Plot distribution of ratings over time
+    ggplot(Q1.2_ratingsByUser, 
+          aes(userId,ratingsByUser)) + 
+          geom_line() +
+          xlab("User Id") +
+          ylab("Total number of ratings given") +
+          ggtitle("Distribution of ratings / user") +
+          theme(panel.background = element_blank())+
+          labs(caption = "a) Distribution of ratings / user \n from 1995 - 2016")
+    
+    # Plot distribution of cumulative ratings by users
+    ggplot(Q1.2_ratingsByUser, 
+          aes(freqUsers,cumUser)) + 
+          geom_line() +
+          xlab("Users") +
+          ylab("Cummulative Ratings") +
+          ggtitle("Growth of ratings with addition of users") +
+          theme(panel.background = element_blank())+
+          labs(caption = "b) Growth of ratings with users \n from 1995 - 2016")
+
+```
+Q1.3 Ratings produced over time
+
+```{r}
+# Calculate ratings per day
+Q1.3_ratingsOverTime=data_moviesRatings%>%
+  group_by(Year,Month,Day)%>%
+  summarise(ratingsByDay=length(rating),users=length(userId))%>%
+  transform(cumFreqDay = frequency(Day),cumFreqRating = cumsum(ratingsByDay),cumUser=cumsum(users))
+
+    
+Q1.3_ratingsOverTime$freqDay<-seq.int(nrow(Q1.3_ratingsOverTime))
+
+# Plot distribution of ratings over time
+ggplot(Q1.3_ratingsOverTime, 
+      aes(freqDay,ratingsByDay)) + 
+      geom_line() +
+      xlab("Days") +
+      ylab("Ratings given / day") +
+      ggtitle("Distribution of ratings over time")+
+          theme(panel.background = element_blank())+
+          labs(caption = "a) Distribution of ratings / day \n from 1995 - 2016")
+
+# Plot distribution of cumulative ratings over time
+ggplot(Q1.3_ratingsOverTime, 
+      aes(freqDay,cumFreqRating)) + 
+      geom_line() +
+      xlab("Days") +
+      ylab("Cumulative Ratings") +
+      ggtitle("Growth of ratings over time")+
+      theme(panel.background = element_blank())+
+          labs(caption = "b) Cummulative ratings over time \n from 1995 - 2016")
+
+```
+
+
+Q2. In order to assess the mood of the user base, explore how the average rating score per day changes over time.
+
+
+```{r}
+# Calculate ratings per day from 1995-2016
+Q2_ratingsOverTime=data_moviesRatings%>%
+  group_by(Year,Month,Day)%>%
+  arrange(Year,Month,Day)%>%
+  summarise(avgRatingsByDay=mean(rating))%>%
+  transform(cumAvg=mean(avgRatingsByDay))
+Q2_ratingsOverTime$freqDay<-seq.int(nrow(Q2_ratingsOverTime))
+
+# Plot distribution of cumulative ratings from 1995-2016
+ggplot(Q2_ratingsOverTime, 
+      aes(freqDay,avgRatingsByDay)) + 
+      geom_line() +
+      xlab("Days") +
+      ylab("Average Rating Score / Day") +
+      ggtitle("Average rating score over time")+
+      theme(panel.background = element_blank())+
+          labs(caption = "")
+
+# Calculate ratings per days (in a month)
+Q2_ratingsOverTimeDay=data_moviesRatings%>%
+  group_by(Day)%>%
+  arrange(Day)%>%
+  summarise(avgRatingsByDay=mean(rating))%>%
+  transform(cumAvg=mean(avgRatingsByDay))
+
+
+# Plot distribution of cumulative ratings over a month
+ggplot(Q2_ratingsOverTimeDay, 
+      aes(Day,avgRatingsByDay)) + 
+      geom_line() +
+      xlab("Days") +
+      ylab("Average Rating Score / Day") +
+      ylim(1,5)+
+      xlim(1,31)+
+      ggtitle("Average rating score / days in a month")+
+      theme(panel.background = element_blank())+
+          labs(caption = "")
+
+
+
+# Calculate ratings per days (in a week)
+Q2_ratingsOverTimeWeek=data_moviesRatings%>%
+  group_by(Week)%>%
+  arrange(Week)%>%
+  summarise(avgRatingsByWeek=mean(rating))%>%
+  transform(cumAvg=mean(avgRatingsByWeek))
+
+
+# Plot distribution of cumulative ratings over week
+ggplot(Q2_ratingsOverTimeWeek, 
+      aes(Week,avgRatingsByWeek)) + 
+      geom_line() +
+      xlab("Week") +
+      ylab("Average Rating Score / Week") +
+      ylim(1,5)+
+      xlim(1,7)+
+      ggtitle("Average rating score / week")+
+      theme(panel.background = element_blank())+
+          labs(caption = "")
+
+
+
+
+# Calculate ratings per month
+Q2_ratingsOverTimeMonth=data_moviesRatings%>%
+  group_by(Month)%>%
+  arrange(Month)%>%
+  summarise(avgRatingsByMonth=mean(rating))%>%
+  transform(cumAvg=mean(avgRatingsByMonth))
+
+
+# Plot distribution of cumulative ratings per month
+ggplot(Q2_ratingsOverTimeMonth, 
+      aes(Month,avgRatingsByMonth)) + 
+      geom_line() +
+      xlab("Months") +
+      ylab("Average Rating Score / Month") +
+      ylim(1,5)+
+      xlim(1,12)+
+      ggtitle("Average rating score/ month")+
+      theme(panel.background = element_blank())+
+          labs(caption = "")
+
+
+```
+
+
+
+Q2. In order to assess the mood of the user base, explore how the average rating score per day changes over time.
+
+
+```{r}
+Hour=data_moviesRatings%>%
+  group_by(Hour,Day,Week,Month, Year)%>%
+  summarise(ratingsByHour=mean(rating))
+
+boxplot(ratingsByHour~Hour, data=Hour, xlab="Hour", ylab="RatingScore",las=2, main="Average Rating Score by Hour",ylim=c(1,5))
+
+
+Week=data_moviesRatings%>%
+  group_by(Week,Month, Year)%>%
+  summarise(ratingsByWeek=mean(rating))
+
+boxplot(ratingsByWeek~Week, data=Week, xlab="Day of the Week", ylab="Average RatingScore",las=2, main="Average Rating Score by Week", ylim=c(1,5))
+
+
+Month=data_moviesRatings%>%
+  group_by(Month, Year)%>%
+  summarise(ratingsByMonth=mean(rating))
+
+boxplot(ratingsByMonth~Month, data=Month, xlab="Month", ylab="Average RatingScore",las=2, main="Average Rating Score by Month", ylim=c(1,5))
+
+
+Year=data_moviesRatings%>%
+  group_by(Day,Year)%>%
+  summarise(ratingsByYear=mean(rating))
+
+boxplot(ratingsByYear~Year, data=Year, xlab="Year", ylab="Average RatingScore",las=2, main="Average Rating Score by Year", ylim=c(1,5))
+
+
+Day=data_moviesRatings%>%
+  group_by(Month,Day)%>%
+  summarise(ratingsByday=mean(rating))
+
+boxplot(ratingsByday~Day, data=Day, xlab="Day of the month", ylab="Average RatingScore",las=2, main="Average Rating Score by Day", ylim=c(1,5))
+```
+
+
+
+Q2. In order to assess the mood of the user base, explore how the average rating score per day changes over time.
+
+
+```{r}
+
+
+Total=data_moviesRatings%>%
+  group_by(userId,Year,Month,Day,Week,Hour)%>%
+  arrange(Year,Month,Day,Week,Hour)%>%
+  summarise(rating=length(rating))
+
+HourRating=Total%>%
+  group_by(Day,Hour)%>%
+  summarise(ratingsByHour=mean(rating))
+
+boxplot(ratingsByHour~Hour, data=HourRating, xlab="Hour", ylab="RatingScore",las=2, main="Rating by Hour")
+
+
+WeekRating=Total%>%
+  group_by(Day,Week)%>%
+  summarise(ratingsByWeek=mean(rating))
+
+boxplot(ratingsByWeek~Week, data=WeekRating, xlab="Day of the Week", ylab="Average RatingScore",las=2, main="Rating by Week")
+
+
+MonthRating=Total%>%
+  group_by(Day,Month)%>%
+  summarise(ratingsByMonth=mean(rating))
+
+boxplot(ratingsByMonth~Month, data=MonthRating, xlab="Month", ylab="Average RatingScore",las=2, main="Rating by Month")
+
+
+YearRating=Total%>%
+  group_by(Day,Year)%>%
+  summarise(ratingsByYear=mean(rating))
+
+boxplot(ratingsByYear~Year, data=YearRating, xlab="Year", ylab="Average RatingScore",las=2, main="Rating by Year")
+
+
+DayRating=Total%>%
+  group_by(Month,Day)%>%
+  summarise(ratingsByday=mean(rating))
+
+boxplot(ratingsByday~Day, data=DayRating, xlab="Day of the month", ylab="Average RatingScore",las=2, main="Rating by Day")
+
+```
+
+
+Q3.What are the top-5 and bottom-5 rated movies, based on their average scores, that have at least 25 ratings?
+```{r}
+Q3.0_avgRatingByMovie=data_moviesRatings%>%
+  group_by(title)%>%
+  summarise(avgRatingByMovie=
+              round(mean(rating),digits=2), totalRatingByMovie=length(rating))%>%
+              filter(totalRatingByMovie>25)%>%
+              arrange(desc(avgRatingByMovie))
+
+Q3.1_top5Movies=head(Q3.0_avgRatingByMovie,5)
+Q3.2_bottom5Movies=tail(Q3.0_avgRatingByMovie,5)
+
+```
+
+
+Genre
+
+```{r}
+install.packages('splitstackshape')
+library(splitstackshape)
+Genre=data_moviesRatings%>%
+  group_by(genres, Year,Month,Week,Day)%>%
+  summarise(ratings=mean(rating))
+Genre <- Genre %>% filter(!((genres=="(no genres listed)")))
+GenreSplit=cSplit(Genre, "genres", "|")
+
+GenreWorksheet2=GenreSplit%>% filter(!((genres_02=="NA")))%>% select(Year,Month,Week,Day,ratings,genres_02)%>% rename(c('genres_02'='genres'))
+GenreWorksheet3=GenreSplit%>% filter(!((genres_03=="NA")))%>% select(Year,Month,Week,Day,ratings,genres_03)%>% rename(c('genres_03'='genres'))
+GenreWorksheet4=GenreSplit%>% filter(!((genres_04=="NA")))%>% select(Year,Month,Week,Day,ratings,genres_04)%>% rename(c('genres_04'='genres'))
+GenreWorksheet5=GenreSplit%>% filter(!((genres_05=="NA")))%>% select(Year,Month,Week,Day,ratings,genres_05)%>% rename(c('genres_05'='genres'))
+GenreWorksheet6=GenreSplit%>% filter(!((genres_06=="NA")))%>% select(Year,Month,Week,Day,ratings,genres_06)%>% rename(c('genres_06'='genres'))
+GenreWorksheet7=GenreSplit%>% filter(!((genres_07=="NA")))%>% select(Year,Month,Week,Day,ratings,genres_07)%>% rename(c('genres_07'='genres'))
+GenreWorksheet8=GenreSplit%>% filter(!((genres_08=="NA")))%>% select(Year,Month,Week,Day,ratings,genres_08)%>% rename(c('genres_08'='genres'))
+GenreWorksheet9=GenreSplit%>% filter(!((genres_09=="NA")))%>% select(Year,Month,Week,Day,ratings,genres_09)%>% rename(c('genres_09'='genres'))
+GenreWorksheet10=GenreSplit%>% filter(!((genres_10=="NA")))%>% select(Year,Month,Week,Day,ratings,genres_10)%>% rename(c('genres_10'='genres'))
+
+
+
+GenreMerge=  do.call("rbind", list(GenreWorksheet2, GenreWorksheet3,GenreWorksheet4,GenreWorksheet5,GenreWorksheet6,GenreWorksheet7,GenreWorksheet8,GenreWorksheet9,GenreWorksheet10))
+
+GenreMerge=as.data.frame(GenreMerge)
+class(GenreMerge)
+```
+
+
+```{r}
+DayGenre=GenreMerge%>%
+  group_by(genres,Day)%>%
+  summarise(ratingsByDay=mean(ratings))
+
+boxplot(ratingsByDay~genres, data=DayGenre,ylab="RatingScore/Day",las=2, main="Average Rating Score by Day",ylim=c(1,5))
+
+
+YearGenre=GenreMerge%>%
+  group_by(genres,Year)%>%
+  summarise(ratingsByYear=mean(ratings))
+
+boxplot(ratingsByYear~genres, data=YearGenre, ylab="RatingScore/Year",las=2, main="Average Rating Score by Year",ylim=c(1,5))
+
+MonthGenre=GenreMerge%>%
+  group_by(genres,Month)%>%
+  summarise(ratingsByMonth=mean(ratings))
+
+boxplot(ratingsByMonth~genres, data=MonthGenre, ylab="RatingScore/Month",las=2, main="Average Rating Score by Month",ylim=c(1,5))
+
+
+WeekGenre=GenreMerge%>%
+  group_by(genres,Week)%>%
+  summarise(ratingsByWeek=mean(ratings))
+
+ggplot(data = WeekGenre, aes(x =genres , y = ratingsByWeek, color = Week)) +       
+  geom_line(aes(group = Week)) + geom_point()+
+  theme(panel.background = element_blank())+labs(caption = "")
+
+
+plot(ratingsByWeek~genres, data=WeekGenre, ylab="RatingScore/Week",las=2, main="Average Rating Score by Week",ylim=c(1,5))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Movies database Growth
+```{r}
+# Movies Database Growth
+
+uniqueMovies=data_moviesRatings[!duplicated(data_moviesRatings[1]),]
+uniqueMovies=uniqueMovies[order(as.Date(uniqueMovies$timestamp, format="%d/%m/%Y")),]
+for (i in 1:length(uniqueMovies$timestamp)) {
+  uniqueMovies$diff[i]<-round(interval(uniqueMovies$timestamp[[1]],uniqueMovies$timestamp[[i]])/ddays(1), digits = 0)
+}
+
+uniqueMovies$daysDiff=c(0, diff(uniqueMovies$diff))
+uniqueMovies$cumMovieDays = cumsum(uniqueMovies$daysDiff)
+uniqueMovies$Seq<-seq.int(nrow(uniqueMovies))
+
+moviesDatabase=uniqueMovies%>%
+  group_by(cumMovieDays)%>%
+  summarise(moviesAdded = length(movieId))%>%
+  transform(cumMovies = cumsum(moviesAdded))
+
+  # Plot movies database growth over days
+    ggplot(moviesDatabase,
+          aes(cumMovieDays,cumMovies)) + 
+          geom_line() +
+          theme(panel.background = element_blank())+
+          ylim(c(1,10000))+
+          xlim(c(1,8000))+
+          xlab("Days Passed") +
+          ylab("Movies Added / Movie database growth") +
+          ggtitle("Movies database growth from 1995 to 2016") +labs(caption = "b) Movies database growth")
+    
+          # Plot new users per day
+    ggplot(usersDatabase,
+          aes(cumUserDays,moviesAdded)) + 
+          geom_line() +
+          theme(panel.background = element_blank())+
+
+          xlab("Days Passed") +
+          ylab("Users Added") +
+          ggtitle("Users database growth from 1995 to 2016") +labs(caption = "a) Users database growth")
+
+```
+Users Database Growth
+
+```{r}
+    
+# Users Database Growth
+
+uniqueUsers=data_moviesRatings[!duplicated(data_moviesRatings[4]),]
+uniqueUsers=uniqueUsers[order(as.Date(uniqueUsers$timestamp, format="%d/%m/%Y")),]
+for (i in 1:length(uniqueUsers$timestamp)) {
+  uniqueUsers$diff[i]<-round(interval(uniqueUsers$timestamp[[1]],uniqueUsers$timestamp[[i]])/ddays(1), digits = 0)
+}
+
+uniqueUsers$daysDiff=c(0, diff(uniqueUsers$diff))
+uniqueUsers$cumUserDays = cumsum(uniqueUsers$daysDiff)
+
+usersDatabase=uniqueUsers%>%
+  group_by(cumUserDays)%>%
+  summarise(usersAdded = length(movieId))%>%
+  transform(cumUsers = cumsum(usersAdded))
+
+  # Plot users database growth over days
+    ggplot(usersDatabase,
+          aes(cumUserDays,cumUsers)) + 
+          geom_line() +
+          theme(panel.background = element_blank())+
+          ylim(c(1,800))+
+          xlim(c(1,8000))+
+          xlab("Days Passed") +
+          ylab("Users Added / User database growth") +
+          ggtitle("Users database growth from 1995 to 2016") +labs(caption = "a) Users database growth")
+    
+      # Plot new users per day
+    ggplot(usersDatabase,
+          aes(cumUserDays,usersAdded)) + 
+          geom_line() +
+          theme(panel.background = element_blank())+
+
+          xlab("Days Passed") +
+          ylab("Users Added") +
+          ggtitle("Users database growth from 1995 to 2016") +labs(caption = "a) Users database growth")
+
+```
+
+    
+
+
+
+
